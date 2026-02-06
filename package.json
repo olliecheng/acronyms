@@ -1,0 +1,11 @@
+{
+  "name": "medical-acronym-search",
+  "version": "1.0.0",
+  "description": "Simple static website for searching medical acronyms",
+  "scripts": {
+    "build": "node build.js"
+  },
+  "keywords": ["medical", "acronyms", "search"],
+  "author": "",
+  "license": "MIT"
+}
