@@ -90,6 +90,9 @@ if (!fs.existsSync('dist')) {
   fs.mkdirSync('dist', { recursive: true });
 }
 
+// Copy favicon to dist
+fs.copyFileSync('favicon.ico', 'dist/favicon.ico');
+
 // Write the output file
 fs.writeFileSync('dist/index.html', html);
 
