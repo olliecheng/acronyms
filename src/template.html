@@ -144,38 +144,94 @@
         }
 
         const normalizedQuery = query.toUpperCase().trim();
+        const queryLower = query.toLowerCase().trim();
+        const isLongQuery = queryLower.length >= 4;
         const results = [];
+        const matchedAcronyms = new Set();
 
-        // Search for matching acronyms
+        // PASS 1: Search acronyms (always)
         for (const [acronym, meanings] of Object.entries(acronyms)) {
           const normalizedAcronym = acronym.toUpperCase();
 
-          // Only search acronym, not meanings (prefix match)
+          // Prefix match on acronym
           if (normalizedAcronym.startsWith(normalizedQuery)) {
+            const isExact = normalizedAcronym === normalizedQuery;
             results.push({
               acronym: acronym,
               meanings: meanings,
-              // For sorting: exact matches first, then by length, then alphabetically
+              // sortKey: [matchTypePriority, matchPosition, length, uppercase]
               sortKey: [
-                normalizedAcronym === normalizedQuery ? 0 : 1,
+                isExact ? 0 : 1,  // 0=exact, 1=prefix
+                0,                 // matchPosition (not used for acronym matches)
                 acronym.length,
                 acronym.toUpperCase()
               ]
             });
+            matchedAcronyms.add(acronym);
           }
 
           // Limit to 50 results for performance
           if (results.length >= 50) break;
         }
 
-        // Sort results
+        // PASS 2: Search meanings (only if query >= 4 chars and < 50 results)
+        if (isLongQuery && results.length < 50) {
+          for (const [acronym, meanings] of Object.entries(acronyms)) {
+            // Skip already matched acronyms
+            if (matchedAcronyms.has(acronym)) continue;
+
+            // Search through all meanings for this acronym
+            let bestMatchType = null;
+            let bestMatchPosition = Infinity;
+
+            for (const meaningObj of meanings) {
+              const meaningLower = meaningObj.meaning.toLowerCase();
+              const matchIndex = meaningLower.indexOf(queryLower);
+
+              if (matchIndex !== -1) {
+                // Check if match is at word boundary
+                const isWordStart = matchIndex === 0 || /[\s-]/.test(meaningLower[matchIndex - 1]);
+                const matchType = isWordStart ? 2 : 3;  // 2=word-start, 3=substring
+
+                // Track the best match for this acronym
+                if (bestMatchType === null || matchType < bestMatchType ||
+                    (matchType === bestMatchType && matchIndex < bestMatchPosition)) {
+                  bestMatchType = matchType;
+                  bestMatchPosition = matchIndex;
+                }
+              }
+            }
+
+            // If we found a match in meanings, add the result
+            if (bestMatchType !== null) {
+              results.push({
+                acronym: acronym,
+                meanings: meanings,
+                sortKey: [
+                  bestMatchType,      // 2=word-start, 3=substring
+                  bestMatchPosition,  // Earlier matches first
+                  acronym.length,
+                  acronym.toUpperCase()
+                ]
+              });
+              matchedAcronyms.add(acronym);
+
+              // Limit to 50 results for performance
+              if (results.length >= 50) break;
+            }
+          }
+        }
+
+        // Sort results by priority
         results.sort((a, b) => {
-          // Exact match first
+          // Match type priority (0=exact, 1=prefix, 2=word-start, 3=substring)
           if (a.sortKey[0] !== b.sortKey[0]) return a.sortKey[0] - b.sortKey[0];
-          // Then by length (shorter first)
+          // Match position (earlier first, for meaning matches)
           if (a.sortKey[1] !== b.sortKey[1]) return a.sortKey[1] - b.sortKey[1];
-          // Then alphabetically
-          return a.sortKey[2].localeCompare(b.sortKey[2]);
+          // Length (shorter first)
+          if (a.sortKey[2] !== b.sortKey[2]) return a.sortKey[2] - b.sortKey[2];
+          // Alphabetically
+          return a.sortKey[3].localeCompare(b.sortKey[3]);
         });
 
         // Render results
