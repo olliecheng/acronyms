@@ -1,167 +1,228 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Medical Acronym Search</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* Custom scrollbar for results */
-    #results::-webkit-scrollbar {
-      width: 8px;
-    }
-    #results::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 4px;
-    }
-    #results::-webkit-scrollbar-thumb {
-      background: #cbd5e1;
-      border-radius: 4px;
-    }
-    #results::-webkit-scrollbar-thumb:hover {
-      background: #94a3b8;
-    }
-  </style>
-</head>
-<body class="bg-gray-50 min-h-screen">
-  <div class="max-w-2xl mx-auto p-4">
-    <!-- Header -->
-    <div class="mb-6 mt-4">
-      <h1 class="text-3xl font-bold text-gray-800 mb-2">Medical Acronym Search</h1>
-      <p class="text-gray-600">Search from over 2,600 clinical abbreviations</p>
-    </div>
-
-    <!-- Search Input -->
-    <div class="mb-4">
-      <input
-        id="search"
-        type="text"
-        placeholder="Type an acronym (e.g., AA, CM, ICU)..."
-        autocomplete="off"
-        autofocus
-        class="w-full text-lg p-4 border-2 border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
-      >
-    </div>
-
-    <!-- Results Container -->
-    <div id="results" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
-
-    <!-- Footer -->
-    <div id="footer" class="mt-8 text-center text-sm text-gray-500">
-      <p>Type an acronym to search • Results update as you type</p>
-    </div>
-  </div>
-
-  <script>
-    // Acronym data injected at build time
-    const acronyms = {{ACRONYM_DATA}};
-
-    // Get DOM elements
-    const searchInput = document.getElementById('search');
-    const resultsContainer = document.getElementById('results');
-
-    // Debounce function to limit search frequency
-    let debounceTimer;
-    function debounce(func, delay) {
-      return function(...args) {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => func.apply(this, args), delay);
-      };
-    }
-
-    // Search function
-    function search(query) {
-      // Clear results if query is empty
-      if (!query || query.trim() === '') {
-        resultsContainer.innerHTML = '';
-        return;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Medical Acronym Search</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Custom scrollbar for results */
+      #results::-webkit-scrollbar {
+        width: 8px;
+      }
+      #results::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+      #results::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      #results::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
       }
 
-      const normalizedQuery = query.toUpperCase().trim();
-      const results = [];
+      /* Header collapse animation */
+      #header {
+        max-height: 120px;
+        opacity: 1;
+        margin-top: 1rem;
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+        transition:
+          max-height 0.15s ease,
+          opacity 0.1s ease,
+          margin-top 0.15s ease,
+          margin-bottom 0.15s ease;
+      }
 
-      // Search for matching acronyms
-      for (const [acronym, meanings] of Object.entries(acronyms)) {
-        const normalizedAcronym = acronym.toUpperCase();
+      #header.collapsed {
+        max-height: 0;
+        opacity: 0;
+        margin-top: 0;
+        margin-bottom: 0;
+      }
 
-        // Only search acronym, not meanings (prefix match)
-        if (normalizedAcronym.startsWith(normalizedQuery)) {
-          results.push({
-            acronym: acronym,
-            meanings: meanings,
-            // For sorting: exact matches first, then by length, then alphabetically
-            sortKey: [
-              normalizedAcronym === normalizedQuery ? 0 : 1,
-              acronym.length,
-              acronym.toUpperCase()
-            ]
-          });
+      /* Footer fade animation */
+      #footer {
+        transition: opacity 0.1s ease;
+      }
+
+      #footer.collapsed {
+        /* opacity: 0; */
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #header,
+        #footer {
+          transition: none;
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-50 min-h-screen">
+    <div class="max-w-2xl mx-auto p-4">
+      <!-- Header -->
+      <div id="header">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">
+          Medical Acronym Search
+        </h1>
+        <p class="text-gray-600">
+          Search from over 2,600 clinical abbreviations
+        </p>
+      </div>
+
+      <!-- Search Input -->
+      <div class="mb-4">
+        <input
+          id="search"
+          type="text"
+          placeholder="Type an acronym (e.g., AA, CM, ICU)..."
+          autocomplete="off"
+          autofocus
+          class="w-full text-lg p-4 border-2 border-blue-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 shadow-sm"
+        />
+      </div>
+
+      <!-- Results Container -->
+      <div id="results" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+
+      <!-- Footer -->
+      <div id="footer" class="mt-8 text-center text-sm text-gray-500">
+        <p>Type an acronym to search • Results update as you type</p>
+      </div>
+    </div>
+
+    <script>
+      // Acronym data injected at build time
+      const acronyms = {{ACRONYM_DATA}};
+
+      // Get DOM elements
+      const searchInput = document.getElementById('search');
+      const resultsContainer = document.getElementById('results');
+      const header = document.getElementById('header');
+      const footer = document.getElementById('footer');
+
+      // Header collapse state
+      let headerCollapsed = false;
+      function setHeaderCollapsed(collapsed) {
+        if (collapsed === headerCollapsed) return;
+        headerCollapsed = collapsed;
+        if (collapsed) {
+          header.classList.add('collapsed');
+          footer.classList.add('collapsed');
+        } else {
+          header.classList.remove('collapsed');
+          footer.classList.remove('collapsed');
+        }
+      }
+
+      // Debounce function to limit search frequency
+      let debounceTimer;
+      function debounce(func, delay) {
+        return function(...args) {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => func.apply(this, args), delay);
+        };
+      }
+
+      // Search function
+      function search(query) {
+        // Clear results if query is empty
+        if (!query || query.trim() === '') {
+          resultsContainer.innerHTML = '';
+          return;
         }
 
-        // Limit to 50 results for performance
-        if (results.length >= 50) break;
+        const normalizedQuery = query.toUpperCase().trim();
+        const results = [];
+
+        // Search for matching acronyms
+        for (const [acronym, meanings] of Object.entries(acronyms)) {
+          const normalizedAcronym = acronym.toUpperCase();
+
+          // Only search acronym, not meanings (prefix match)
+          if (normalizedAcronym.startsWith(normalizedQuery)) {
+            results.push({
+              acronym: acronym,
+              meanings: meanings,
+              // For sorting: exact matches first, then by length, then alphabetically
+              sortKey: [
+                normalizedAcronym === normalizedQuery ? 0 : 1,
+                acronym.length,
+                acronym.toUpperCase()
+              ]
+            });
+          }
+
+          // Limit to 50 results for performance
+          if (results.length >= 50) break;
+        }
+
+        // Sort results
+        results.sort((a, b) => {
+          // Exact match first
+          if (a.sortKey[0] !== b.sortKey[0]) return a.sortKey[0] - b.sortKey[0];
+          // Then by length (shorter first)
+          if (a.sortKey[1] !== b.sortKey[1]) return a.sortKey[1] - b.sortKey[1];
+          // Then alphabetically
+          return a.sortKey[2].localeCompare(b.sortKey[2]);
+        });
+
+        // Render results
+        renderResults(results);
       }
 
-      // Sort results
-      results.sort((a, b) => {
-        // Exact match first
-        if (a.sortKey[0] !== b.sortKey[0]) return a.sortKey[0] - b.sortKey[0];
-        // Then by length (shorter first)
-        if (a.sortKey[1] !== b.sortKey[1]) return a.sortKey[1] - b.sortKey[1];
-        // Then alphabetically
-        return a.sortKey[2].localeCompare(b.sortKey[2]);
+      // Render results to DOM
+      function renderResults(results) {
+        if (results.length === 0) {
+          resultsContainer.innerHTML = `
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
+              <p class="text-gray-600">No acronyms found matching your search.</p>
+            </div>
+          `;
+          return;
+        }
+
+        const html = results.map(result => {
+          const meaningsHtml = result.meanings.map(m => `
+            <div class="mb-2 last:mb-0">
+              <p class="text-gray-700">${escapeHtml(m.meaning)}</p>
+              ${m.note ? `<p class="text-sm text-gray-500 italic mt-1">${escapeHtml(m.note)}</p>` : ''}
+            </div>
+          `).join('');
+
+          return `
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+              <div class="text-xl font-bold text-blue-600 mb-2">${escapeHtml(result.acronym)}</div>
+              ${meaningsHtml}
+            </div>
+          `;
+        }).join('');
+
+        resultsContainer.innerHTML = html;
+      }
+
+      // Escape HTML to prevent XSS
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // Event listener with debouncing
+      const debouncedSearch = debounce((value) => search(value), 50);
+
+      searchInput.addEventListener('input', (e) => {
+        setHeaderCollapsed(e.target.value.trim().length > 0);
+        debouncedSearch(e.target.value);
       });
 
-      // Render results
-      renderResults(results);
-    }
-
-    // Render results to DOM
-    function renderResults(results) {
-      if (results.length === 0) {
-        resultsContainer.innerHTML = `
-          <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
-            <p class="text-gray-600">No acronyms found matching your search.</p>
-          </div>
-        `;
-        return;
+      // Initial search if there's a value (e.g., from browser autocomplete)
+      if (searchInput.value) {
+        setHeaderCollapsed(true);
+        search(searchInput.value);
       }
-
-      const html = results.map(result => {
-        const meaningsHtml = result.meanings.map(m => `
-          <div class="mb-2 last:mb-0">
-            <p class="text-gray-700">${escapeHtml(m.meaning)}</p>
-            ${m.note ? `<p class="text-sm text-gray-500 italic mt-1">${escapeHtml(m.note)}</p>` : ''}
-          </div>
-        `).join('');
-
-        return `
-          <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
-            <div class="text-xl font-bold text-blue-600 mb-2">${escapeHtml(result.acronym)}</div>
-            ${meaningsHtml}
-          </div>
-        `;
-      }).join('');
-
-      resultsContainer.innerHTML = html;
-    }
-
-    // Escape HTML to prevent XSS
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // Event listener with debouncing
-    searchInput.addEventListener('input', debounce((e) => {
-      search(e.target.value);
-    }, 50));
-
-    // Initial search if there's a value (e.g., from browser autocomplete)
-    if (searchInput.value) {
-      search(searchInput.value);
-    }
-  </script>
-</body>
+    </script>
+  </body>
 </html>
