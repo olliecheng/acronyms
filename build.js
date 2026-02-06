@@ -91,7 +91,8 @@ if (!fs.existsSync('dist')) {
 }
 
 // Copy favicon to dist
-fs.copyFileSync('favicon.ico', 'dist/favicon.ico');
+fs.copyFileSync('assets/favicon.ico', 'dist/favicon.ico');
+fs.copyFileSync('assets/favicon.png', 'dist/favicon.png');
 
 // Write the output file
 fs.writeFileSync('dist/index.html', html);
